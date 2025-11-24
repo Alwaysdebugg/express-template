@@ -1,0 +1,941 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Express MVC - 用户管理系统</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      h1 {
+        color: white;
+        text-align: center;
+        margin-bottom: 30px;
+        font-size: 2.5em;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+      }
+
+      .section {
+        background: white;
+        padding: 25px;
+        margin: 20px 0;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      .section h2 {
+        color: #333;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #667eea;
+      }
+
+      .button-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 15px;
+      }
+
+      button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 12px 24px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+
+      button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      }
+
+      button:active {
+        transform: translateY(0);
+      }
+
+      button.danger {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      }
+
+      button.success {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      }
+
+      button.secondary {
+        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+      }
+
+      .form-group {
+        margin-bottom: 15px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 5px;
+        color: #555;
+        font-weight: 500;
+      }
+
+      input {
+        width: 100%;
+        padding: 10px;
+        border: 2px solid #e0e0e0;
+        border-radius: 6px;
+        font-size: 14px;
+        transition: border-color 0.3s;
+      }
+
+      input:focus {
+        outline: none;
+        border-color: #667eea;
+      }
+
+      .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+      }
+
+      pre {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 6px;
+        overflow-x: auto;
+        border: 1px solid #e0e0e0;
+        max-height: 400px;
+        overflow-y: auto;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .user-list {
+        display: grid;
+        gap: 15px;
+        margin-top: 15px;
+      }
+
+      .user-card {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        border-left: 4px solid #667eea;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .user-info {
+        flex: 1;
+      }
+
+      .user-info h3 {
+        color: #333;
+        margin-bottom: 5px;
+      }
+
+      .user-info p {
+        color: #666;
+        font-size: 14px;
+      }
+
+      .user-actions {
+        display: flex;
+        gap: 10px;
+      }
+
+      .status {
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 500;
+        margin-bottom: 10px;
+        display: inline-block;
+      }
+
+      .status.success {
+        background: #d4edda;
+        color: #155724;
+      }
+
+      .status.error {
+        background: #f8d7da;
+        color: #721c24;
+      }
+
+      .loading {
+        text-align: center;
+        color: #666;
+        padding: 20px;
+      }
+
+      .auth-status {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .auth-info {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+      }
+
+      .auth-info .user-name {
+        font-weight: 600;
+        color: #333;
+      }
+
+      .auth-info .user-email {
+        color: #666;
+        font-size: 14px;
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      .tabs {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #e0e0e0;
+      }
+
+      .tab {
+        padding: 10px 20px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 16px;
+        color: #666;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+        transition: color 0.3s;
+      }
+
+      .tab.active {
+        color: #667eea;
+        border-bottom-color: #667eea;
+        font-weight: 600;
+      }
+
+      .tab-content {
+        display: none;
+      }
+
+      .tab-content.active {
+        display: block;
+      }
+
+      @media (max-width: 768px) {
+        .form-row {
+          grid-template-columns: 1fr;
+        }
+
+        .user-card {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .user-actions {
+          width: 100%;
+          margin-top: 10px;
+        }
+
+        button {
+          flex: 1;
+        }
+
+        .auth-status {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 10px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🚀 Express MVC - 用户管理系统</h1>
+
+      <!-- 认证状态栏 -->
+      <div class="auth-status" id="auth-status">
+        <div class="auth-info" id="auth-info">
+          <div>
+            <span class="user-name" id="user-name">未登录</span>
+            <div class="user-email" id="user-email"></div>
+          </div>
+        </div>
+        <div class="button-group">
+          <button id="login-btn" onclick="showAuthSection('login')">登录</button>
+          <button id="register-btn" onclick="showAuthSection('register')">注册</button>
+          <button class="danger" id="logout-btn" onclick="logout()" style="display: none;">退出登录</button>
+        </div>
+      </div>
+
+      <!-- 登录/注册区域 -->
+      <div class="section" id="auth-section">
+        <h2>🔐 登录 / 注册</h2>
+        <div class="tabs">
+          <button class="tab active" onclick="switchTab('login')">登录</button>
+          <button class="tab" onclick="switchTab('register')">注册</button>
+        </div>
+
+        <!-- 登录表单 -->
+        <div id="login-tab" class="tab-content active">
+          <form id="login-form" onsubmit="handleLogin(event)">
+            <div class="form-group">
+              <label>邮箱:</label>
+              <input
+                type="email"
+                id="login-email"
+                placeholder="输入邮箱"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label>密码:</label>
+              <input
+                type="password"
+                id="login-password"
+                placeholder="输入密码"
+                required
+              />
+            </div>
+            <button type="submit" class="success">登录</button>
+          </form>
+          <pre id="login-result"></pre>
+        </div>
+
+        <!-- 注册表单 -->
+        <div id="register-tab" class="tab-content">
+          <form id="register-form" onsubmit="handleRegister(event)">
+            <div class="form-group">
+              <label>姓名:</label>
+              <input
+                type="text"
+                id="register-name"
+                placeholder="输入姓名"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label>邮箱:</label>
+              <input
+                type="email"
+                id="register-email"
+                placeholder="输入邮箱"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label>密码:</label>
+              <input
+                type="password"
+                id="register-password"
+                placeholder="密码至少6个字符"
+                required
+                minlength="6"
+              />
+            </div>
+            <button type="submit" class="success">注册</button>
+          </form>
+          <pre id="register-result"></pre>
+        </div>
+      </div>
+
+      <!-- 获取所有用户 -->
+      <div class="section">
+        <h2>📋 用户列表</h2>
+        <div class="button-group">
+          <button class="success" onclick="loadAllUsers()">刷新用户列表</button>
+        </div>
+        <div id="users-list" class="user-list"></div>
+        <pre id="users-result"></pre>
+      </div>
+
+      <!-- 获取单个用户 -->
+      <div class="section">
+        <h2>🔍 查询用户</h2>
+        <div class="form-group">
+          <label>用户 ID:</label>
+          <div style="display: flex; gap: 10px;">
+            <input
+              type="number"
+              id="user-id-input"
+              placeholder="输入用户ID"
+              value="1"
+            />
+            <button onclick="getUserById()">查询</button>
+          </div>
+        </div>
+        <pre id="user-result"></pre>
+      </div>
+
+      <!-- 创建用户 -->
+      <div class="section">
+        <h2>➕ 创建用户</h2>
+        <form id="create-form" onsubmit="createUser(event)">
+          <div class="form-row">
+            <div class="form-group">
+              <label>姓名:</label>
+              <input
+                type="text"
+                id="create-name"
+                placeholder="输入姓名"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label>邮箱:</label>
+              <input
+                type="email"
+                id="create-email"
+                placeholder="输入邮箱"
+                required
+              />
+            </div>
+          </div>
+          <button type="submit" class="success">创建用户</button>
+        </form>
+        <pre id="create-result"></pre>
+      </div>
+
+      <!-- 更新用户 -->
+      <div class="section">
+        <h2>✏️ 更新用户</h2>
+        <form id="update-form" onsubmit="updateUser(event)">
+          <div class="form-group">
+            <label>用户 ID:</label>
+            <input
+              type="number"
+              id="update-id"
+              placeholder="输入要更新的用户ID"
+              required
+            />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>姓名:</label>
+              <input
+                type="text"
+                id="update-name"
+                placeholder="输入新姓名"
+              />
+            </div>
+            <div class="form-group">
+              <label>邮箱:</label>
+              <input
+                type="email"
+                id="update-email"
+                placeholder="输入新邮箱"
+              />
+            </div>
+          </div>
+          <button type="submit" class="secondary">更新用户</button>
+        </form>
+        <pre id="update-result"></pre>
+      </div>
+
+      <!-- 删除用户 -->
+      <div class="section">
+        <h2>🗑️ 删除用户</h2>
+        <div class="form-group">
+          <label>用户 ID:</label>
+          <div style="display: flex; gap: 10px;">
+            <input
+              type="number"
+              id="delete-id-input"
+              placeholder="输入要删除的用户ID"
+            />
+            <button class="danger" onclick="deleteUser()">删除用户</button>
+          </div>
+        </div>
+        <pre id="delete-result"></pre>
+      </div>
+    </div>
+
+    <script>
+      const API_BASE = '/api/users';
+      const AUTH_API_BASE = '/api/auth';
+      const TOKEN_KEY = 'auth_token';
+      const USER_KEY = 'user_info';
+
+      // Token 管理
+      function getToken() {
+        return localStorage.getItem(TOKEN_KEY);
+      }
+
+      function setToken(token) {
+        localStorage.setItem(TOKEN_KEY, token);
+      }
+
+      function removeToken() {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(USER_KEY);
+      }
+
+      function getUserInfo() {
+        const userStr = localStorage.getItem(USER_KEY);
+        return userStr ? JSON.parse(userStr) : null;
+      }
+
+      function setUserInfo(user) {
+        localStorage.setItem(USER_KEY, JSON.stringify(user));
+      }
+
+      // 获取认证请求头
+      function getAuthHeaders() {
+        const token = getToken();
+        const headers = {
+          'Content-Type': 'application/json',
+        };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        return headers;
+      }
+
+      // 更新认证状态显示
+      function updateAuthStatus() {
+        const user = getUserInfo();
+        const userNameEl = document.getElementById('user-name');
+        const userEmailEl = document.getElementById('user-email');
+        const loginBtn = document.getElementById('login-btn');
+        const registerBtn = document.getElementById('register-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+        const authSection = document.getElementById('auth-section');
+
+        if (user) {
+          userNameEl.textContent = `👤 ${user.name}`;
+          userEmailEl.textContent = user.email;
+          loginBtn.style.display = 'none';
+          registerBtn.style.display = 'none';
+          logoutBtn.style.display = 'block';
+          authSection.style.display = 'none';
+        } else {
+          userNameEl.textContent = '未登录';
+          userEmailEl.textContent = '';
+          loginBtn.style.display = 'block';
+          registerBtn.style.display = 'block';
+          logoutBtn.style.display = 'none';
+          authSection.style.display = 'block';
+        }
+      }
+
+      // 显示认证区域
+      function showAuthSection(type) {
+        const authSection = document.getElementById('auth-section');
+        authSection.style.display = 'block';
+        if (type === 'login') {
+          switchTab('login');
+        } else if (type === 'register') {
+          switchTab('register');
+        }
+      }
+
+      // 切换标签页
+      function switchTab(tab) {
+        // 更新标签按钮
+        const tabs = document.querySelectorAll('.tab');
+        tabs.forEach((t, index) => {
+          t.classList.remove('active');
+          if ((tab === 'login' && index === 0) || (tab === 'register' && index === 1)) {
+            t.classList.add('active');
+          }
+        });
+
+        // 更新内容
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.getElementById(`${tab}-tab`).classList.add('active');
+      }
+
+      // 登录
+      async function handleLogin(event) {
+        event.preventDefault();
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
+        const resultElement = document.getElementById('login-result');
+
+        try {
+          const response = await fetch(`${AUTH_API_BASE}/login`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email, password }),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            setToken(data.data.token);
+            setUserInfo(data.data.user);
+            updateAuthStatus();
+            showSuccess('login-result', data);
+            document.getElementById('login-form').reset();
+            // 自动刷新用户列表
+            loadAllUsers();
+          } else {
+            showError('login-result', data.error || data.message || '登录失败');
+          }
+        } catch (error) {
+          showError('login-result', error);
+        }
+      }
+
+      // 注册
+      async function handleRegister(event) {
+        event.preventDefault();
+        const name = document.getElementById('register-name').value;
+        const email = document.getElementById('register-email').value;
+        const password = document.getElementById('register-password').value;
+        const resultElement = document.getElementById('register-result');
+
+        if (password.length < 6) {
+          showError('register-result', { message: '密码长度至少为 6 个字符' });
+          return;
+        }
+
+        try {
+          const response = await fetch(`${AUTH_API_BASE}/register`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ name, email, password }),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            setToken(data.data.token);
+            setUserInfo(data.data.user);
+            updateAuthStatus();
+            showSuccess('register-result', data);
+            document.getElementById('register-form').reset();
+            // 自动刷新用户列表
+            loadAllUsers();
+          } else {
+            showError('register-result', data.error || data.message || '注册失败');
+          }
+        } catch (error) {
+          showError('register-result', error);
+        }
+      }
+
+      // 退出登录
+      function logout() {
+        if (confirm('确定要退出登录吗？')) {
+          removeToken();
+          updateAuthStatus();
+          // 清空所有结果显示
+          document.querySelectorAll('pre').forEach(el => el.textContent = '');
+          document.getElementById('users-list').innerHTML = '';
+        }
+      }
+
+      // 验证 token
+      async function verifyToken() {
+        const token = getToken();
+        if (!token) {
+          return false;
+        }
+
+        try {
+          const response = await fetch(`${AUTH_API_BASE}/verify`, {
+            method: 'GET',
+            headers: getAuthHeaders(),
+          });
+
+          const data = await response.json();
+          if (data.success) {
+            setUserInfo(data.data.user);
+            return true;
+          }
+        } catch (error) {
+          console.error('Token 验证失败:', error);
+        }
+
+        // Token 无效，清除
+        removeToken();
+        return false;
+      }
+
+      // 格式化 JSON 显示
+      function formatJSON(data) {
+        return JSON.stringify(data, null, 2);
+      }
+
+      // 显示错误信息
+      function showError(elementId, error) {
+        const element = document.getElementById(elementId);
+        element.textContent = formatJSON({
+          success: false,
+          error: error.message || error.error || error,
+        });
+        element.style.borderColor = '#f5576c';
+      }
+
+      // 显示成功信息
+      function showSuccess(elementId, data) {
+        const element = document.getElementById(elementId);
+        element.textContent = formatJSON(data);
+        element.style.borderColor = '#43e97b';
+      }
+
+      // 加载所有用户
+      async function loadAllUsers() {
+        const resultElement = document.getElementById('users-result');
+        const listElement = document.getElementById('users-list');
+        
+        resultElement.textContent = '加载中...';
+        listElement.innerHTML = '<div class="loading">加载中...</div>';
+
+        try {
+          const response = await fetch(API_BASE, {
+            headers: getAuthHeaders(),
+          });
+          const data = await response.json();
+
+          if (data.success) {
+            showSuccess('users-result', data);
+            
+            // 显示用户卡片列表
+            if (data.data && data.data.length > 0) {
+              listElement.innerHTML = data.data
+                .map(
+                  (user) => `
+                  <div class="user-card">
+                    <div class="user-info">
+                      <h3>${user.name}</h3>
+                      <p>📧 ${user.email}</p>
+                      <p style="font-size: 12px; color: #999;">ID: ${user.id} | 创建时间: ${user.createdAt || 'N/A'}</p>
+                    </div>
+                    <div class="user-actions">
+                      <button onclick="getUserById(${user.id})">查看</button>
+                      <button class="danger" onclick="deleteUserById(${user.id})">删除</button>
+                    </div>
+                  </div>
+                `
+                )
+                .join('');
+            } else {
+              listElement.innerHTML = '<div class="loading">暂无用户数据</div>';
+            }
+          } else {
+            if (response.status === 401) {
+              // Token 过期或无效
+              removeToken();
+              updateAuthStatus();
+              showError('users-result', { error: '认证失败，请重新登录' });
+            } else {
+              showError('users-result', data.error || '获取用户列表失败');
+            }
+            listElement.innerHTML = '';
+          }
+        } catch (error) {
+          showError('users-result', error);
+          listElement.innerHTML = '';
+        }
+      }
+
+      // 根据ID获取用户
+      async function getUserById(id = null) {
+        const userId = id || document.getElementById('user-id-input').value;
+        if (!userId) {
+          alert('请输入用户ID');
+          return;
+        }
+
+        try {
+          const response = await fetch(`${API_BASE}/${userId}`, {
+            headers: getAuthHeaders(),
+          });
+          const data = await response.json();
+
+          if (data.success) {
+            showSuccess('user-result', data);
+          } else {
+            if (response.status === 401) {
+              removeToken();
+              updateAuthStatus();
+              showError('user-result', { error: '认证失败，请重新登录' });
+            } else {
+              showError('user-result', data.error || '用户不存在');
+            }
+          }
+        } catch (error) {
+          showError('user-result', error);
+        }
+      }
+
+      // 创建用户
+      async function createUser(event) {
+        event.preventDefault();
+
+        const name = document.getElementById('create-name').value;
+        const email = document.getElementById('create-email').value;
+
+        try {
+          const response = await fetch(API_BASE, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ name, email }),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            showSuccess('create-result', data);
+            // 重置表单
+            document.getElementById('create-form').reset();
+            // 刷新用户列表
+            loadAllUsers();
+          } else {
+            if (response.status === 401) {
+              removeToken();
+              updateAuthStatus();
+              showError('create-result', { error: '认证失败，请重新登录' });
+            } else {
+              showError('create-result', data.error || '创建失败');
+            }
+          }
+        } catch (error) {
+          showError('create-result', error);
+        }
+      }
+
+      // 更新用户
+      async function updateUser(event) {
+        event.preventDefault();
+
+        const id = document.getElementById('update-id').value;
+        const name = document.getElementById('update-name').value;
+        const email = document.getElementById('update-email').value;
+
+        if (!name && !email) {
+          alert('请至少填写一个要更新的字段');
+          return;
+        }
+
+        const updateData = {};
+        if (name) updateData.name = name;
+        if (email) updateData.email = email;
+
+        try {
+          const response = await fetch(`${API_BASE}/${id}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(updateData),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            showSuccess('update-result', data);
+            // 重置表单
+            document.getElementById('update-form').reset();
+            // 刷新用户列表
+            loadAllUsers();
+          } else {
+            if (response.status === 401) {
+              removeToken();
+              updateAuthStatus();
+              showError('update-result', { error: '认证失败，请重新登录' });
+            } else {
+              showError('update-result', data.error || '更新失败');
+            }
+          }
+        } catch (error) {
+          showError('update-result', error);
+        }
+      }
+
+      // 删除用户
+      async function deleteUser(id = null) {
+        const userId = id || document.getElementById('delete-id-input').value;
+        if (!userId) {
+          alert('请输入用户ID');
+          return;
+        }
+
+        if (!confirm(`确定要删除用户 ID ${userId} 吗？`)) {
+          return;
+        }
+
+        try {
+          const response = await fetch(`${API_BASE}/${userId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            showSuccess('delete-result', data);
+            // 清空输入框
+            document.getElementById('delete-id-input').value = '';
+            // 刷新用户列表
+            loadAllUsers();
+          } else {
+            if (response.status === 401) {
+              removeToken();
+              updateAuthStatus();
+              showError('delete-result', { error: '认证失败，请重新登录' });
+            } else {
+              showError('delete-result', data.error || '删除失败');
+            }
+          }
+        } catch (error) {
+          showError('delete-result', error);
+        }
+      }
+
+      // 通过ID删除用户（从用户卡片调用）
+      async function deleteUserById(id) {
+        if (confirm(`确定要删除用户 ID ${id} 吗？`)) {
+          await deleteUser(id);
+        }
+      }
+
+      // 页面加载时初始化
+      window.addEventListener('DOMContentLoaded', async () => {
+        // 验证现有 token
+        const isValid = await verifyToken();
+        updateAuthStatus();
+        
+        // 如果已登录，加载用户列表
+        if (isValid) {
+          loadAllUsers();
+        }
+      });
+    </script>
+  </body>
+</html>
