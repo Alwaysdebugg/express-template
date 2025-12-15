@@ -1,14 +1,22 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import passport from './config/passport.js';
 import usersRouter from './routers/users.js';
 import authRouter from './routers/auth.js';
+import oauthRouter from './routers/oauth.js';
+import moodRouter from './routers/moods.js';
+import communityRouter from './routers/community.js';
+import { OAuth2Client } from 'google-auth-library';
 
 // 加载环境变量
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// 初始化 Passport
+app.use(passport.initialize());
 
 // CORS 配置
 const corsOptions = {
@@ -61,8 +69,12 @@ app.get('/', (req, res) => {
 });
 
 // API 路由
-app.use('/api/auth', authRouter);  // 认证路由（公开）
+app.use('/api/auth', authRouter); // 认证路由（公开）
 app.use('/api/users', usersRouter); // 用户路由
+app.use('/oauth2', oauthRouter); // OAuth 路由
+
+app.use('/api/moods', moodRouter); // 心情记录
+// app.use('/api/community', communityRouter); // 社区互动路由
 
 // ==================== 404 处理 ====================
 app.use((req, res) => {
@@ -84,18 +96,4 @@ app.use((err, req, res, next) => {
 // ==================== 启动服务器 ====================
 app.listen(PORT, '127.0.0.1', () => {
   console.log(`🚀 服务器运行在 http://127.0.0.1:${PORT}`);
-  console.log(`\n📝 API 文档:`);
-  console.log(`\n🔐 认证 API:`);
-  console.log(`   POST   /api/auth/register  - 用户注册`);
-  console.log(`   POST   /api/auth/login     - 用户登录`);
-  console.log(`   GET    /api/auth/me        - 获取当前用户（需要认证）`);
-  console.log(`   GET    /api/auth/verify    - 验证 token（需要认证）`);
-  console.log(`\n👥 用户 API（需要认证）:`);
-  console.log(`   GET    /api/users          - 获取所有用户`);
-  console.log(`   GET    /api/users/:id      - 获取单个用户`);
-  console.log(`   POST   /api/users          - 创建用户`);
-  console.log(`   PUT    /api/users/:id      - 更新用户`);
-  console.log(`   DELETE /api/users/:id      - 删除用户`);
-  console.log(`\n💡 提示：使用 JWT token 访问需要认证的端点`);
-  console.log(`   请求头格式: Authorization: Bearer <token>\n`);
 });

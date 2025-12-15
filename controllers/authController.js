@@ -1,7 +1,86 @@
 // controllers/authController.js
 import UserModel from '../models/User.js';
 import { generateToken } from '../utils/jwtUtils.js';
+import { OAuth2Client } from 'google-auth-library';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+/**
+ * 验证Google凭证
+ */
+export const verifyGoogleCredential = async (req, res) => {
+  try {
+    const { credential } = req.body;
+
+    if(!credential) {
+      return res.status(400).json({
+        success: false,
+        error: '缺少凭证',
+        message: 'credential 字段是必需的',
+      });
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    })
+
+    const payload = ticket.getPayload();
+    const { email, name, sub: googleId, picture } = payload;
+
+    if(!email) {
+      return res.status(400).json({
+        success: false,
+        error: '缺少邮箱',
+        message: 'Google 凭证中缺少邮箱',
+      });
+    }
+
+    // 查找或创建用户
+    let user = await UserModel.getUserByEmail(email);
+    if(!user) {
+      const userData = {
+        name: name || email.split("@")[0],
+        email: email,
+      };
+      user = await UserModel.createUser(userData)
+    }
+
+    // 生成JWT token
+    const token = generateToken({
+      id: user.id,
+      email: user.email,
+      name: user,name,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+        },
+        token,
+      },
+      message: "Google login successfully"
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: '验证凭证失败',
+      message: error.message,
+    });
+  }
+}
+
+
+
+
 
 /**
  * 用户登录
@@ -214,3 +293,73 @@ export const verifyToken = async (req, res) => {
   }
 };
 
+/**
+ * 验证请求体中的 token (用于 OAuth 回调验证)
+ */
+export const verifyTokenFromBody = async (req, res) => {
+  try {
+    const { token } = req.body;
+    
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        error: '缺少 token',
+        message: '请求体中需要包含 token',
+      });
+    }
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+      if (err) {
+        return res.status(403).json({
+          success: false,
+          error: 'Token 无效',
+          message: err.message,
+        });
+      }
+      
+      // 返回用户信息和原始 token (以匹配前端 authAPI.verifyCallbackToken 预期的 { user, accessToken })
+      res.json({
+        success: true,
+        user: user, // AuthContext expects "user" at root or data.user?
+        accessToken: token, // AuthContext expects "accessToken"
+        // Adjusting response to match frontend expectations if necessary
+        // AuthContext: const { user, accessToken } = await authAPI.verifyCallbackToken(token)
+        // So this structure is expected at the ROOT of the JSON response.
+      });
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: '验证失败',
+      message: error.message,
+    });
+  }
+};
+
+/**
+ * Google OAuth 回调处理
+ */
+export const googleCallback = async (req, res) => {
+  try {
+    const user = req.user;
+    
+    if (!user) {
+      throw new Error('User not found in request');
+    }
+    
+    // 生成 JWT token
+    const token = generateToken({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+    });
+    
+    // 重定向到前端回调页面
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    res.redirect(`${frontendUrl}/login-callback?token=${token}`);
+  } catch (error) {
+    console.error('Google callback error:', error);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    res.redirect(`${frontendUrl}/login?error=auth_failed`);
+  }
+};

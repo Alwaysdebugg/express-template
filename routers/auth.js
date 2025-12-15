@@ -2,6 +2,7 @@
 import express from 'express';
 import * as authController from '../controllers/authController.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
+import passport from '../config/passport.js';
 
 const router = express.Router();
 
@@ -17,5 +18,16 @@ router.get('/me', authenticateToken, authController.getCurrentUser);
 // GET /api/auth/verify - 验证 token（需要认证）
 router.get('/verify', authenticateToken, authController.verifyToken);
 
-export default router;
+// POST /api/auth/verify-token - 验证 token (前端专用 - 从 body 获取)
+router.post('/verify-token', authController.verifyTokenFromBody);
 
+// POST /api/auth/verify-google-credential - Google 登录验证 (新增)
+router.post('/verify-google-credential', authController.verifyGoogleCredential);
+
+// Google OAuth 回调
+router.get('/google/callback', 
+  passport.authenticate('google', { session: false, failureRedirect: '/login?error=auth_failed' }),
+  authController.googleCallback
+);
+
+export default router;

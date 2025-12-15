@@ -6,8 +6,11 @@
 
 - ✅ **MVC 架构** - 清晰的代码组织结构
 - ✅ **JWT 认证** - 基于 JSON Web Token 的身份验证
+- ✅ **Google OAuth** - 支持 Google 账户登录
 - ✅ **密码加密** - 使用 bcrypt 加密存储密码
 - ✅ **Supabase 集成** - 使用 Supabase 作为数据库
+- ✅ **心情记录 API** - 完整的心情 CRUD 接口
+- ✅ **社区功能 API** - 社区互动和点赞回复功能
 - ✅ **CORS 支持** - 跨域资源共享配置
 - ✅ **错误处理** - 统一的错误处理机制
 - ✅ **环境变量** - 使用 dotenv 管理配置
@@ -56,6 +59,16 @@ JWT_EXPIRES_IN=24h
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your_anon_key_here
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+
+# Google OAuth 配置
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+
+# CORS 配置
+CORS_ORIGIN=http://localhost:5173
+
+# 前端 URL（用于 OAuth 回调重定向）
+FRONTEND_URL=http://localhost:5173
 ```
 
 ### 4. 设置 Supabase 数据库
@@ -138,16 +151,78 @@ Content-Type: application/json
 }
 ```
 
+#### Google OAuth 登录验证
+```http
+POST /api/auth/verify-google-credential
+Content-Type: application/json
+
+{
+  "credential": "google_id_token_here"
+}
+```
+
+**响应：**
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": "uuid",
+      "name": "用户名",
+      "email": "user@gmail.com"
+    },
+    "token": "jwt_token_here"
+  },
+  "message": "Google login successfully"
+}
+```
+
 #### 获取当前用户信息（需要认证）
 ```http
 GET /api/auth/me
 Authorization: Bearer <token>
 ```
 
+**响应：**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "uuid",
+    "name": "张三",
+    "email": "zhangsan@example.com",
+    "created_at": "2024-01-01T00:00:00.000Z",
+    "updated_at": "2024-01-01T00:00:00.000Z"
+  }
+}
+```
+
 #### 验证 Token（需要认证）
 ```http
 GET /api/auth/verify
 Authorization: Bearer <token>
+```
+
+#### 验证 Token（从请求体获取）
+```http
+POST /api/auth/verify-token
+Content-Type: application/json
+
+{
+  "token": "jwt_token_here"
+}
+```
+
+### Google OAuth 路由
+
+#### Google 登录入口
+```http
+GET /oauth2/authorization/google
+```
+
+#### Google OAuth 回调
+```http
+GET /api/auth/google/callback
 ```
 
 ### 用户 API（需要认证）
@@ -200,6 +275,127 @@ DELETE /api/users/:id
 Authorization: Bearer <token>
 ```
 
+### 心情记录 API（需要认证）
+
+所有心情记录 API 都需要在请求头中添加认证 token。
+
+#### 获取心情记录列表
+```http
+GET /api/moods
+Authorization: Bearer <token>
+```
+
+**响应：**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "uuid",
+      "user_id": "user_uuid",
+      "mood_type": "good",
+      "note": "今天心情不错",
+      "triggers": ["工作", "运动"],
+      "is_public": false,
+      "is_anonymous": false,
+      "created_at": "2024-01-01T00:00:00.000Z"
+    }
+  ],
+  "message": "获取心情记录列表成功"
+}
+```
+
+#### 创建心情记录
+```http
+POST /api/moods
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "mood_type": "good",
+  "note": "今天心情不错",
+  "triggers": ["工作", "运动"],
+  "is_public": false,
+  "is_anonymous": false
+}
+```
+
+**心情类型 (mood_type) 可选值：**
+- `very_bad` - 非常差 (1)
+- `bad` - 差 (2)
+- `neutral` - 一般 (3)
+- `good` - 好 (4)
+- `excellent` - 非常好 (5)
+
+**响应：**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "uuid",
+    "user_id": "user_uuid",
+    "mood_type": "good",
+    "note": "今天心情不错",
+    "triggers": ["工作", "运动"],
+    "is_public": false,
+    "is_anonymous": false,
+    "created_at": "2024-01-01T00:00:00.000Z"
+  },
+  "message": "心情记录创建成功"
+}
+```
+
+#### 获取心情记录详情
+```http
+GET /api/moods/:id
+Authorization: Bearer <token>
+```
+
+#### 删除心情记录
+```http
+DELETE /api/moods/:id
+Authorization: Bearer <token>
+```
+
+### 社区 API（待启用）
+
+> 注意：社区 API 路由目前已注释，待启用
+
+#### 获取在线用户
+```http
+GET /api/community/online-users
+```
+
+#### 获取社区心情列表
+```http
+GET /api/community/moods
+```
+
+#### 获取社区心情详情
+```http
+GET /api/community/moods/:id
+```
+
+#### 点赞社区心情
+```http
+POST /api/community/moods/:id/like
+```
+
+#### 取消点赞
+```http
+POST /api/community/moods/:id/unlike
+```
+
+#### 回复社区心情
+```http
+POST /api/community/moods/:id/reply
+Content-Type: application/json
+
+{
+  "content": "回复内容"
+}
+```
+
 ## 🧪 测试 API
 
 ### 使用 curl
@@ -222,6 +418,20 @@ curl http://127.0.0.1:3000/api/auth/me \
 # 获取所有用户
 curl http://127.0.0.1:3000/api/users \
   -H "Authorization: Bearer <token>"
+
+# 创建心情记录
+curl -X POST http://127.0.0.1:3000/api/moods \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -d '{"mood_type":"good","note":"今天心情不错","triggers":["工作","运动"],"is_public":false}'
+
+# 获取心情记录列表
+curl http://127.0.0.1:3000/api/moods \
+  -H "Authorization: Bearer <token>"
+
+# 删除心情记录（替换 <mood_id> 为实际的 ID）
+curl -X DELETE http://127.0.0.1:3000/api/moods/<mood_id> \
+  -H "Authorization: Bearer <token>"
 ```
 
 ### 使用测试脚本
@@ -233,19 +443,28 @@ curl http://127.0.0.1:3000/api/users \
 ```
 express/
 ├── config/                 # 配置文件
+│   ├── passport.js        # Passport OAuth 配置
 │   └── supabase.js        # Supabase 客户端配置
 ├── controllers/           # 控制器（业务逻辑）
 │   ├── authController.js  # 认证控制器
+│   ├── communityController.js  # 社区控制器
+│   ├── moodController.js  # 心情记录控制器
 │   └── userController.js  # 用户控制器
 ├── middleware/            # 中间件
 │   └── authMiddleware.js  # JWT 认证中间件
 ├── models/                # 数据模型
+│   ├── Community.js      # 社区模型
+│   ├── Moods.js          # 心情记录模型
 │   └── User.js           # 用户模型
 ├── routers/              # 路由
 │   ├── auth.js          # 认证路由
+│   ├── community.js     # 社区路由
+│   ├── moods.js         # 心情记录路由
+│   ├── oauth.js         # OAuth 路由
 │   └── users.js         # 用户路由
 ├── utils/               # 工具函数
-│   └── jwtUtils.js     # JWT 工具函数
+│   ├── jwtUtils.js     # JWT 工具函数
+│   └── userUtils.js    # 用户工具函数
 ├── Doc/                # 文档
 │   ├── JWT_MIDDLEWARE.md      # JWT 中间件使用指南
 │   ├── SUPABASE_SETUP.md      # Supabase 配置指南
@@ -277,6 +496,7 @@ express/
 - **框架**：Express.js 5.x
 - **数据库**：Supabase (PostgreSQL)
 - **认证**：JSON Web Token (JWT)
+- **OAuth**：Passport.js + Google Auth Library
 - **密码加密**：bcryptjs
 - **环境变量**：dotenv
 - **CORS**：cors
