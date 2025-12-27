@@ -55,6 +55,8 @@ async function createMood(moodData) {
       is_public: moodData.is_public !== undefined ? moodData.is_public : false,
       is_anonymous:
         moodData.is_anonymous !== undefined ? moodData.is_anonymous : false,
+      likes_count: 0,
+      reply_count: 0,
     };
 
     // 如果前端提供了 created_at，使用它（否则使用数据库默认值）
@@ -72,6 +74,47 @@ async function createMood(moodData) {
     return data;
   } catch (error) {
     console.error('创建心情记录失败:', error);
+    throw error;
+  }
+}
+
+// 获取社区心情列表 (is_public:true)
+async function getPublicMoods() {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('moods')
+      .select(
+        `
+      *,
+      users (
+        id,
+        name,
+        email
+      )
+    `
+      )
+      .eq('is_public', true) // 只查询公开的心情
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    // 处理匿名用户，如果 is_anonymous 为 true，隐藏用户信息
+    const processedData = data.map(mood => {
+      const result = { ...mood };
+      if (mood.is_anonymous && mood.users) {
+        result.users = {
+          id: null,
+          name: 'anonymous',
+          email: null,
+        };
+      }
+
+      return result;
+    });
+
+    return processedData || [];
+  } catch (error) {
+    console.error('获取社区心情列表失败:', error);
     throw error;
   }
 }
@@ -160,4 +203,5 @@ export default {
   getMoodById,
   deleteMood,
   updateMood,
+  getPublicMoods,
 };

@@ -1,5 +1,6 @@
 // controllers/communityController.js
 import communityModel from '../models/Community.js';
+import moodModel from '../models/Moods.js';
 
 // 获取当前在线用户
 export const getOnlineUsers = async (req, res) => {
@@ -15,10 +16,40 @@ export const getOnlineUsers = async (req, res) => {
   }
 };
 
+// 更新在线状态（心跳）
+export const updateOnlineStatus = async (req, res) => {
+  try {
+    await communityModel.updateOnlineStatus(req.body.sessionId);
+    res.status(200).json({
+      success: true,
+      data: onlineUsers,
+      message: '更新在线状态成功',
+    });
+  } catch (error) {
+    res.status(500).json({ error: '更新在线状态失败' });
+  }
+};
+
+// 移除在线状态（登出）
+export const removeOnlineStatus = async (req, res) => {
+  try {
+    const onlineUsers = await communityModel.removeOnlineStatus(
+      req.body.sessionId
+    );
+    res.status(200).json({
+      success: true,
+      data: onlineUsers,
+      message: '移除在线状态成功',
+    });
+  } catch (error) {
+    res.status(500).json({ error: '移除在线状态失败' });
+  }
+};
+
 // 获取社区心情列表
 export const getCommunityMoods = async (req, res) => {
   try {
-    const communityMoods = await communityModel.getCommunityMoods();
+    const communityMoods = await moodModel.getPublicMoods();
     res.status(200).json({
       success: true,
       data: communityMoods,
@@ -94,6 +125,8 @@ export const replyToCommunityMood = async (req, res) => {
 
 export default {
   getOnlineUsers,
+  updateOnlineStatus,
+  removeOnlineStatus,
   getCommunityMoods,
   getCommunityMoodById,
   likeCommunityMood,

@@ -101,3 +101,63 @@ CREATE INDEX IF NOT EXISTS idx_moods_triggers ON moods USING GIN (triggers);
 -- CREATE POLICY "Users can delete own moods" 
 --   ON moods FOR DELETE 
 --   USING (auth.uid()::bigint = user_id);
+
+--- 12/26
+
+-- Table: moods
+-- 1. 删除旧的 JSONB 互动字段
+ALTER TABLE moods DROP COLUMN IF EXISTS interactions;
+
+-- 2. 添加统一的点赞计数器（冗余字段，用于快速读取）
+ALTER TABLE moods ADD COLUMN IF NOT EXISTS likes_count INTEGER DEFAULT 0;
+
+-- 3. (可选) 确保 reply_count 字段存在（你之前的 SQL 已包含，这里做检查）
+-- ALTER TABLE moods ADD COLUMN IF NOT EXISTS reply_count INTEGER DEFAULT 0;
+
+-- 创建 interactions 表（核心社交功能）
+
+CREATE TABLE IF NOT EXISTS interactions (
+    id BIGSERIAL PRIMARY KEY,
+    mood_id BIGINT NOT NULL REFERENCES moods(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- 对应你文档中的 5 种互动类型
+    interaction_type VARCHAR(20) NOT NULL CHECK (
+        interaction_type IN ('empathy', 'support', 'helpful', 'grateful', 'encourage')
+    ),
+    
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    -- 核心约束：同一个用户对同一个心情，每种互动类型只能操作一次
+    CONSTRAINT unique_user_mood_interaction UNIQUE(user_id, mood_id, interaction_type)
+);
+
+-- 索引：方便查询某条心情的所有互动，或某个用户的所有互动
+CREATE INDEX IF NOT EXISTS idx_interactions_mood_id ON interactions(mood_id);
+CREATE INDEX IF NOT EXISTS idx_interactions_user_id ON interactions(user_id);
+
+
+-- 创建 comments 表（回复功能）
+
+CREATE TABLE IF NOT EXISTS comments (
+    id BIGSERIAL PRIMARY KEY,
+    mood_id BIGINT NOT NULL REFERENCES moods(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- 支持二级回复：如果 parent_id 不为空，说明是回复别人的评论
+    parent_id BIGINT REFERENCES comments(id) ON DELETE CASCADE,
+    
+    content TEXT NOT NULL,
+    is_anonymous BOOLEAN DEFAULT FALSE,
+    
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 索引：提高获取某条心情下所有评论的速度
+CREATE INDEX IF NOT EXISTS idx_comments_mood_id ON comments(mood_id);
+-- 触发器：复用你已有的更新时间函数
+CREATE TRIGGER update_comments_updated_at 
+    BEFORE UPDATE ON comments
+    FOR EACH ROW 
+    EXECUTE FUNCTION update_updated_at_column();

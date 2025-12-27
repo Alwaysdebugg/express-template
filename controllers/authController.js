@@ -5,7 +5,8 @@ import { OAuth2Client } from 'google-auth-library';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_SECRET =
+  process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 /**
@@ -15,7 +16,7 @@ export const verifyGoogleCredential = async (req, res) => {
   try {
     const { credential } = req.body;
 
-    if(!credential) {
+    if (!credential) {
       return res.status(400).json({
         success: false,
         error: '缺少凭证',
@@ -26,12 +27,12 @@ export const verifyGoogleCredential = async (req, res) => {
     const ticket = await googleClient.verifyIdToken({
       idToken: credential,
       audience: process.env.GOOGLE_CLIENT_ID,
-    })
+    });
 
     const payload = ticket.getPayload();
     const { email, name, sub: googleId, picture } = payload;
 
-    if(!email) {
+    if (!email) {
       return res.status(400).json({
         success: false,
         error: '缺少邮箱',
@@ -41,19 +42,20 @@ export const verifyGoogleCredential = async (req, res) => {
 
     // 查找或创建用户
     let user = await UserModel.getUserByEmail(email);
-    if(!user) {
+    if (!user) {
       const userData = {
-        name: name || email.split("@")[0],
+        name: name || email.split('@')[0],
         email: email,
       };
-      user = await UserModel.createUser(userData)
+      user = await UserModel.createUser(userData);
     }
 
     // 生成JWT token
     const token = generateToken({
       id: user.id,
       email: user.email,
-      name: user,name,
+      name: user,
+      name,
     });
 
     res.json({
@@ -66,9 +68,8 @@ export const verifyGoogleCredential = async (req, res) => {
         },
         token,
       },
-      message: "Google login successfully"
+      message: 'Google login successfully',
     });
-
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -76,11 +77,7 @@ export const verifyGoogleCredential = async (req, res) => {
       message: error.message,
     });
   }
-}
-
-
-
-
+};
 
 /**
  * 用户登录
@@ -133,6 +130,13 @@ export const login = async (req, res) => {
       email: user.email,
       name: user.name,
     });
+
+    // 更新用户在线状态
+    try {
+      await communityModel.updateUserOnlineStatus(user.id, token);
+    } catch (error) {
+      console.error('更新用户在线状态失败:', error);
+    }
 
     res.json({
       success: true,
@@ -193,7 +197,7 @@ export const register = async (req, res) => {
     // 加密密码
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(password, saltRounds);
-    
+
     // 创建用户（包含加密后的密码）
     const userData = { name, email, password_hash: passwordHash };
     const user = await UserModel.createUser(userData);
@@ -299,7 +303,7 @@ export const verifyToken = async (req, res) => {
 export const verifyTokenFromBody = async (req, res) => {
   try {
     const { token } = req.body;
-    
+
     if (!token) {
       return res.status(400).json({
         success: false,
@@ -316,7 +320,7 @@ export const verifyTokenFromBody = async (req, res) => {
           message: err.message,
         });
       }
-      
+
       // 返回用户信息和原始 token (以匹配前端 authAPI.verifyCallbackToken 预期的 { user, accessToken })
       res.json({
         success: true,
@@ -342,18 +346,18 @@ export const verifyTokenFromBody = async (req, res) => {
 export const googleCallback = async (req, res) => {
   try {
     const user = req.user;
-    
+
     if (!user) {
       throw new Error('User not found in request');
     }
-    
+
     // 生成 JWT token
     const token = generateToken({
       id: user.id,
       email: user.email,
       name: user.name,
     });
-    
+
     // 重定向到前端回调页面
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     res.redirect(`${frontendUrl}/login-callback?token=${token}`);

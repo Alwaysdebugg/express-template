@@ -47,25 +47,7 @@ app.use(express.static('public'));
 
 // 首页
 app.get('/', (req, res) => {
-  res.send(`
-    <h1>Express MVC 架构示例</h1>
-    <h2>认证 API（公开）：</h2>
-    <ul>
-      <li>POST   /api/auth/register  - 用户注册</li>
-      <li>POST   /api/auth/login     - 用户登录</li>
-      <li>GET    /api/auth/me        - 获取当前用户（需要认证）</li>
-      <li>GET    /api/auth/verify    - 验证 token（需要认证）</li>
-    </ul>
-    <h2>用户 API（需要认证）：</h2>
-    <ul>
-      <li>GET    /api/users          - 获取所有用户</li>
-      <li>GET    /api/users/:id      - 获取单个用户</li>
-      <li>POST   /api/users          - 创建用户</li>
-      <li>PUT    /api/users/:id      - 更新用户</li>
-      <li>DELETE /api/users/:id      - 删除用户</li>
-    </ul>
-    <p><strong>注意：</strong>所有用户 API 都需要在请求头中添加 <code>Authorization: Bearer &lt;token&gt;</code> 来访问</p>
-  `);
+  res.status(404);
 });
 
 // API 路由
@@ -74,7 +56,7 @@ app.use('/api/users', usersRouter); // 用户路由
 app.use('/oauth2', oauthRouter); // OAuth 路由
 
 app.use('/api/moods', moodRouter); // 心情记录
-// app.use('/api/community', communityRouter); // 社区互动路由
+app.use('/api/community', communityRouter); // 社区互动路由
 
 // ==================== 404 处理 ====================
 app.use((req, res) => {

@@ -1,11 +1,25 @@
 // routers/community.js
 import express from 'express';
 import * as communityController from '../controllers/communityController.js';
-
+import { authenticateToken } from '../middleware/authMiddleware.js';
 const router = express.Router();
 
 // GET /api/community/online-users - 获取当前在线用户
 router.get('/online-users', communityController.getOnlineUsers);
+
+// POST /api/community/online-status/heartbeat - 更新在线状态（心跳）
+router.post(
+  '/online-status/heartbeat',
+  authenticateToken,
+  communityController.updateOnlineStatus
+);
+
+// POST /api/community/online-status/remove - 移除在线状态（登出）
+router.post(
+  '/online-status/remove',
+  authenticateToken,
+  communityController.removeOnlineStatus
+);
 
 // GET /api/community/moods - 获取社区心情列表
 router.get('/moods', communityController.getCommunityMoods);

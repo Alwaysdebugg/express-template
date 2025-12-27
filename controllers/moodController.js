@@ -30,11 +30,15 @@ export const createMood = async (req, res) => {
     };
 
     const mood = await moodModel.createMood(moodData);
+    const message = moodData.is_public
+      ? '心情记录创建成功，已发布到社区'
+      : '心情记录创建成功';
 
     res.status(200).json({
       success: true,
       data: mood,
-      message: '心情记录创建成功',
+      message: message,
+      isCommunityPost: moodData.is_public || false,
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
