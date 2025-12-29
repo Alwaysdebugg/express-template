@@ -148,10 +148,23 @@ export const cleanupExpiredOnlineUsers = async (timeoutMinutes = 5) => {
   }
 };
 
+// 获取社区话题
+export const getCommunityTopics = async () => {
+  try {
+    const { data, error } = await supabaseAdmin.from('topics').select('*');
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('database error:', error);
+    throw error;
+  }
+};
+
 export default {
   updateUserOnlineStatus,
   getOnlineUsers,
   getOnlineUsersCount,
   removeUserOnlineStatus,
   cleanupExpiredOnlineUsers,
+  getCommunityTopics,
 };

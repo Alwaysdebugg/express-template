@@ -161,3 +161,30 @@ CREATE TRIGGER update_comments_updated_at
     BEFORE UPDATE ON comments
     FOR EACH ROW 
     EXECUTE FUNCTION update_updated_at_column();
+
+
+-- 12/28
+-- topics 表 (话题主表)
+-- 存储话题元数据
+CREATE TABLE IF NOT EXISTS topics (
+  id BIGSERIAL PRIMARY KEY,
+  slug VARCHAR(50) UNIQUE NOT NULL, -- 唯一标识，用于 URL，如 'work-stress'
+  name VARCHAR(50) NOT NULL,        -- 显示名称，如 '工作压力'
+  description TEXT,                 -- 话题简介
+  icon_url TEXT,                    -- 话题图标
+  post_count INTEGER DEFAULT 0,     -- 冗余统计：该话题下的帖子总数
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 初始一些话题
+INSERT INTO topics (slug, name) VALUES ('daily', '日常碎碎念'), ('growth', '自我成长');
+
+-- mood_topics 表 (关联表)
+-- 将心情记录与话题连接起来
+CREATE TABLE IF NOT EXISTS mood_topics (
+  mood_id BIGINT NOT NULL REFERENCES moods(id) ON DELETE CASCADE,
+  topic_id BIGINT NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
+  PRIMARY KEY (mood_id, topic_id)
+);
+
+CREATE INDEX idx_topic_moods ON mood_topics(topic_id);

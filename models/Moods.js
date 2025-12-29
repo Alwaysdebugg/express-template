@@ -11,6 +11,80 @@ const MOOD_TYPE_TO_NUMBER = {
   excellent: 5,
 };
 
+// 生成匿名用户信息
+function generateAnonymousUser(userId) {
+  const nicknames = [
+    '温暖的向日葵',
+    '勇敢的小树',
+    '坚强的云朵',
+    '平静的湖水',
+    '乐观的星星',
+    '智慧的月亮',
+    '温柔的微风',
+    '坚韧的竹子',
+    '纯真的雪花',
+    '希望的晨光',
+    '安静的山谷',
+    '活力的彩虹',
+    '宁静的森林',
+    '美好的花朵',
+    '自由的鸟儿',
+  ];
+
+  const avatarColors = [
+    'bg-gradient-to-br from-pink-400 to-purple-400',
+    'bg-gradient-to-br from-blue-400 to-teal-400',
+    'bg-gradient-to-br from-green-400 to-emerald-400',
+    'bg-gradient-to-br from-yellow-400 to-orange-400',
+    'bg-gradient-to-br from-purple-400 to-indigo-400',
+    'bg-gradient-to-br from-red-400 to-pink-400',
+  ];
+
+  // 使用 userId 作为种子，确保同一用户总是生成相同的匿名信息
+  // 简单的哈希函数，将 userId 转换为 0-1 之间的值
+  const hashUserId = id => {
+    if (!id) return Math.random();
+    const str = String(id);
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash) / 2147483647; // Normalize to 0-1
+  };
+
+  const seed = hashUserId(userId);
+  const nicknameIndex = Math.floor(seed * nicknames.length);
+  const avatarIndex = Math.floor(seed * avatarColors.length);
+
+  return {
+    id: userId ? String(userId) : `anonymous_${Date.now()}`,
+    name: nicknames[nicknameIndex],
+    email: '',
+    avatar: avatarColors[avatarIndex],
+    isOnline: false,
+    lastActive: null,
+  };
+}
+
+// 处理敏感内容
+function processContent(content) {
+  if (!content) return '';
+  let processed = content;
+
+  // 移除可能的个人信息
+  processed = processed.replace(/我叫\S+|我是\S+/g, '我');
+  processed = processed.replace(/\d{11}|\d{3}-\d{4}-\d{4}/g, '[联系方式]');
+  processed = processed.replace(/\S+公司|\S+学校/g, '[工作/学习场所]');
+
+  // 软化负面表达
+  processed = processed.replace(/想死|不想活/g, '很难过');
+  processed = processed.replace(/恨|讨厌/g, '不喜欢');
+
+  return processed;
+}
+
 // 获取心情记录列表（可选：按用户ID筛选）
 async function getMoods(user_id = null) {
   try {
@@ -81,7 +155,8 @@ async function createMood(moodData) {
 // 获取社区心情列表 (is_public:true)
 async function getPublicMoods() {
   try {
-    const { data, error } = await supabaseAdmin
+    // 查询公开的心情记录
+    const { data: moods, error: moodsError } = await supabaseAdmin
       .from('moods')
       .select(
         `
@@ -93,26 +168,164 @@ async function getPublicMoods() {
       )
     `
       )
-      .eq('is_public', true) // 只查询公开的心情
+      .eq('is_public', true)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (moodsError) throw moodsError;
+    if (!moods || moods.length === 0) return [];
 
-    // 处理匿名用户，如果 is_anonymous 为 true，隐藏用户信息
-    const processedData = data.map(mood => {
-      const result = { ...mood };
-      if (mood.is_anonymous && mood.users) {
-        result.users = {
-          id: null,
-          name: 'anonymous',
-          email: null,
+    // 获取所有心情的 ID
+    const moodIds = moods.map(m => m.id);
+
+    // 批量查询所有互动数据
+    const { data: allInteractions, error: interactionsError } =
+      await supabaseAdmin
+        .from('interactions')
+        .select('mood_id, interaction_type')
+        .in('mood_id', moodIds);
+
+    if (interactionsError) {
+      console.warn('获取互动数据失败:', interactionsError);
+    }
+
+    // 批量查询所有评论数据
+    const { data: allComments, error: commentsError } = await supabaseAdmin
+      .from('comments')
+      .select(
+        `
+      id,
+      mood_id,
+      user_id,
+      content,
+      is_anonymous,
+      created_at,
+      users (
+        id,
+        name,
+        email
+      )
+    `
+      )
+      .in('mood_id', moodIds)
+      .is('parent_id', null) // 只获取一级评论
+      .order('created_at', { ascending: true });
+
+    if (commentsError) {
+      console.warn('获取评论数据失败:', commentsError);
+    }
+
+    // 按 mood_id 组织互动数据
+    const interactionsByMood = {};
+    if (allInteractions) {
+      allInteractions.forEach(interaction => {
+        if (!interactionsByMood[interaction.mood_id]) {
+          interactionsByMood[interaction.mood_id] = {
+            empathy: 0,
+            support: 0,
+            helpful: 0,
+            grateful: 0,
+            encourage: 0,
+          };
+        }
+        if (
+          interactionsByMood[interaction.mood_id].hasOwnProperty(
+            interaction.interaction_type
+          )
+        ) {
+          interactionsByMood[interaction.mood_id][
+            interaction.interaction_type
+          ]++;
+        }
+      });
+    }
+
+    // 按 mood_id 组织评论数据
+    const commentsByMood = {};
+    if (allComments) {
+      allComments.forEach(comment => {
+        if (!commentsByMood[comment.mood_id]) {
+          commentsByMood[comment.mood_id] = [];
+        }
+        commentsByMood[comment.mood_id].push(comment);
+      });
+    }
+
+    // 转换数据格式
+    const processedData = moods.map(mood => {
+      const moodId = mood.id;
+      const isAnonymous = mood.is_anonymous;
+
+      // 处理用户信息
+      let user;
+      if (isAnonymous) {
+        user = generateAnonymousUser(mood.user_id);
+      } else {
+        user = {
+          id: String(mood.users?.id || mood.user_id),
+          name: mood.users?.name || '匿名用户',
+          email: mood.users?.email || '',
+          avatar: generateAnonymousUser(mood.user_id).avatar, // 使用相同的逻辑生成头像
+          isOnline: false,
+          lastActive: null,
         };
       }
 
-      return result;
+      // 处理评论
+      const replies = (commentsByMood[moodId] || []).map(comment => {
+        const commentIsAnonymous = comment.is_anonymous;
+        let commentUser;
+        if (commentIsAnonymous) {
+          commentUser = generateAnonymousUser(comment.user_id);
+        } else {
+          commentUser = {
+            id: String(comment.users?.id || comment.user_id),
+            name: comment.users?.name || '匿名用户',
+            email: comment.users?.email || '',
+            avatar: generateAnonymousUser(comment.user_id).avatar,
+            isOnline: false,
+            lastActive: null,
+          };
+        }
+
+        return {
+          id: String(comment.id),
+          user: commentUser,
+          content: comment.content,
+          timestamp: comment.created_at, // 前端期望 timestamp 字段
+          isAIGenerated: false,
+        };
+      });
+
+      // 转换心情类型为数字
+      const moodNumber = MOOD_TYPE_TO_NUMBER[mood.mood_type] || 3;
+
+      // 处理内容
+      const note = mood.note || '';
+      const processedContent = processContent(note);
+
+      return {
+        id: String(mood.id),
+        user: user,
+        content: note, // 原始内容
+        note: note,
+        processedContent: processedContent,
+        mood: moodNumber,
+        mood_type: mood.mood_type,
+        created_at: mood.created_at,
+        updated_at: mood.updated_at,
+        interactions: interactionsByMood[moodId] || {
+          empathy: 0,
+          support: 0,
+          helpful: 0,
+          grateful: 0,
+          encourage: 0,
+        },
+        replies: replies,
+        tags: Array.isArray(mood.triggers) ? mood.triggers : [],
+      };
     });
 
-    return processedData || [];
+    return processedData;
   } catch (error) {
     console.error('获取社区心情列表失败:', error);
     throw error;

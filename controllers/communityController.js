@@ -46,10 +46,25 @@ export const removeOnlineStatus = async (req, res) => {
   }
 };
 
-// 获取社区心情列表
+// 获取社区话题
+export const getCommunityTopics = async (req, res) => {
+  try {
+    const communityTopics = await communityModel.getCommunityTopics();
+    res.status(200).json({
+      success: true,
+      data: communityTopics,
+      message: '获取社区话题成功',
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'controller error:' + error });
+  }
+};
+
+// 获取社区心情Post列表
 export const getCommunityMoods = async (req, res) => {
   try {
     const communityMoods = await moodModel.getPublicMoods();
+
     res.status(200).json({
       success: true,
       data: communityMoods,

@@ -21,6 +21,9 @@ router.post(
   communityController.removeOnlineStatus
 );
 
+// GET /api/community/topics - 获取社区话题
+router.get('/topics', communityController.getCommunityTopics);
+
 // GET /api/community/moods - 获取社区心情列表
 router.get('/moods', communityController.getCommunityMoods);
 
