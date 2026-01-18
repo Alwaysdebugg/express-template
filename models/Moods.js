@@ -153,7 +153,7 @@ async function createMood(moodData) {
 }
 
 // 获取社区心情列表 (is_public:true)
-async function getPublicMoods() {
+async function getPublicMoods(userId = null) {
   try {
     // 查询公开的心情记录
     const { data: moods, error: moodsError } = await supabaseAdmin
@@ -188,6 +188,25 @@ async function getPublicMoods() {
       console.warn('获取互动数据失败:', interactionsError);
     }
 
+    // 如果提供了userId，查询该用户的互动状态
+    let userInteractions = {};
+    if (userId) {
+      const { data: userInteractionData, error: userInteractionsError } =
+        await supabaseAdmin
+          .from('interactions')
+          .select('mood_id, interaction_type')
+          .in('mood_id', moodIds)
+          .eq('user_id', userId);
+
+      if (userInteractionsError) {
+        console.warn('获取用户互动数据失败:', userInteractionsError);
+      } else if (userInteractionData) {
+        userInteractionData.forEach(item => {
+          userInteractions[item.mood_id] = item.interaction_type;
+        });
+      }
+    }
+
     // 批量查询所有评论数据
     const { data: allComments, error: commentsError } = await supabaseAdmin
       .from('comments')
@@ -220,11 +239,8 @@ async function getPublicMoods() {
       allInteractions.forEach(interaction => {
         if (!interactionsByMood[interaction.mood_id]) {
           interactionsByMood[interaction.mood_id] = {
-            empathy: 0,
-            support: 0,
-            helpful: 0,
-            grateful: 0,
-            encourage: 0,
+            like: 0,
+            unlike: 0,
           };
         }
         if (
@@ -314,12 +330,10 @@ async function getPublicMoods() {
         created_at: mood.created_at,
         updated_at: mood.updated_at,
         interactions: interactionsByMood[moodId] || {
-          empathy: 0,
-          support: 0,
-          helpful: 0,
-          grateful: 0,
-          encourage: 0,
+          like: 0,
+          unlike: 0,
         },
+        userInteraction: userInteractions[moodId] || null, // 当前用户的互动状态
         replies: replies,
         tags: Array.isArray(mood.triggers) ? mood.triggers : [],
       };

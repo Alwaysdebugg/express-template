@@ -1,6 +1,7 @@
 // controllers/communityController.js
 import communityModel from '../models/Community.js';
 import moodModel from '../models/Moods.js';
+import interactionsModel from '../models/Interactions.js';
 
 // 获取当前在线用户
 export const getOnlineUsers = async (req, res) => {
@@ -63,7 +64,8 @@ export const getCommunityTopics = async (req, res) => {
 // 获取社区心情Post列表
 export const getCommunityMoods = async (req, res) => {
   try {
-    const communityMoods = await moodModel.getPublicMoods();
+    const userId = req.user?.id || null; // 从认证中间件获取用户ID（可选）
+    const communityMoods = await moodModel.getPublicMoods(userId);
 
     res.status(200).json({
       success: true,
@@ -124,19 +126,63 @@ export const unlikeCommunityMood = async (req, res) => {
 // 回复社区心情
 export const replyToCommunityMood = async (req, res) => {
   try {
-    const communityMood = await communityModel.replyToCommunityMood(
-      req.params.id,
-      req.body
-    );
+    const userId = req.user.id; // 从认证中间件获取用户ID
+    const moodId = req.params.id;
+    const { content, isAnonymous, parentId } = req.body;
+
+
+    const reply = await communityModel.replyToCommunityMood(moodId, { userId, content, isAnonymous: isAnonymous || false, parentId: parentId || null });
+
     res.status(200).json({
       success: true,
-      data: communityMood,
-      message: '回复社区心情成功',
+      data: reply,
+      message: 'reply to community mood success',
     });
   } catch (error) {
-    res.status(500).json({ error: '回复社区心情失败' });
+    res.status(500).json({ error: 'reply to community mood failed' });
   }
 };
+
+// 添加或切换互动
+export const addInteraction = async (req, res) => {
+  try {
+    const userId = req.user.id; // 从认证中间件获取用户ID
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const moodId = parseInt(req.params.id, 10);
+    if (isNaN(moodId)) {
+      return res.status(400).json({ error: 'Invalid mood ID' });
+    }
+    const { interactionType } = req.body;
+
+    // 添加或切换互动
+    const result = await interactionsModel.addInteraction(moodId, userId, interactionType);
+
+    // 获取互动统计
+    const interactions = await interactionsModel.getMoodInteractions(moodId);
+
+    // 获取用户当前的互动状态
+    const userInteraction = result.action === 'removed' ? null : result.interactionType;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ...interactions,
+        userInteraction: userInteraction,
+        action: result.action,
+      },
+      message: result.action === 'removed' ? '已取消互动' : '互动成功',
+    });
+  }
+  catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'interaction failed: ' + error.message
+    });
+  }
+}
 
 export default {
   getOnlineUsers,
@@ -147,4 +193,5 @@ export default {
   likeCommunityMood,
   unlikeCommunityMood,
   replyToCommunityMood,
+  addInteraction,
 };

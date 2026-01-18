@@ -68,7 +68,7 @@ export const getOnlineUsers = async (timeoutMinutes = 5) => {
       if (
         !uniqueUsers.has(userId) ||
         new Date(record.last_active_at) >
-          new Date(uniqueUsers.get(userId).last_active_at)
+        new Date(uniqueUsers.get(userId).last_active_at)
       ) {
         uniqueUsers.set(userId, {
           id: record.users.id,
@@ -160,6 +160,61 @@ export const getCommunityTopics = async () => {
   }
 };
 
+// 回复社区心情
+export const replyToCommunityMood = async (moodId, replyData) => {
+  try {
+    const { userId, content, isAnonymous = false, parentId = null } = replyData;
+
+    if (!content || !content.trim()) {
+      throw new Error('content is required');
+    }
+
+    // 创建评论
+    const { data: comment, error: commentError } = await supabaseAdmin.from('comments').insert({
+      mood_id: moodId,
+      user_id: userId,
+      content: content.trim(),
+      is_anonymous: isAnonymous,
+      parent_id: parentId,
+    }).select(
+      `
+      *,
+      users (
+        id,
+        name,
+        email
+      )
+    `
+    ).single();
+
+    if (commentError) throw commentError;
+
+    // 更新心情记录回复数
+    const { error: updateError } = await supabaseAdmin.rpc('increment_reply_count', {
+      mood_id_param: moodId,
+    });
+
+    // 如果 RPC 不存在，手动更新
+    if (updateError) {
+      const { data: mood } = await supabaseAdmin
+        .from('moods')
+        .select('replay_count')
+        .eq('id', moodId)
+        .single();
+
+      await supabaseAdmin
+        .from('moods')
+        .update({ reply_count: (mood?.reply_count || 0) + 1 })
+        .eq('id', moodId);
+    }
+
+    return comment;
+  } catch (error) {
+    console.error('回复社区心情失败:', error);
+    throw error;
+  }
+}
+
 export default {
   updateUserOnlineStatus,
   getOnlineUsers,
@@ -167,4 +222,5 @@ export default {
   removeUserOnlineStatus,
   cleanupExpiredOnlineUsers,
   getCommunityTopics,
+  replyToCommunityMood
 };

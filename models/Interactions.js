@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../config/supabase.js';
 
-// 添加互动（点赞、支持等）
+// 添加或切换互动（点赞、支持等）
 async function addInteraction(moodId, userId, interactionType) {
   try {
     // 验证互动类型
@@ -10,12 +10,37 @@ async function addInteraction(moodId, userId, interactionType) {
       'helpful',
       'grateful',
       'encourage',
+      'like', // 当前只有点赞和不喜欢两种互动类型
+      'unlike',
     ];
     if (!validTypes.includes(interactionType)) {
       throw new Error(`无效的互动类型: ${interactionType}`);
     }
 
-    // 插入互动记录（如果已存在会因唯一约束失败）
+    // 检查用户当前的互动状态
+    const { data: existingInteraction, error: checkError } = await supabaseAdmin
+      .from('interactions')
+      .select('interaction_type')
+      .eq('mood_id', moodId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (checkError) {
+      throw checkError;
+    }
+
+    // 如果用户已经进行过相同类型的互动，则取消该互动
+    if (existingInteraction && existingInteraction.interaction_type === interactionType) {
+      await removeInteraction(moodId, userId, interactionType);
+      return { action: 'removed', interactionType };
+    }
+
+    // 如果用户已经进行过不同类型的互动，先删除旧的
+    if (existingInteraction && existingInteraction.interaction_type !== interactionType) {
+      await removeInteraction(moodId, userId, existingInteraction.interaction_type);
+    }
+
+    // 添加新的互动
     const { data, error } = await supabaseAdmin
       .from('interactions')
       .insert({
@@ -27,15 +52,11 @@ async function addInteraction(moodId, userId, interactionType) {
       .single();
 
     if (error) {
-      // 如果是唯一约束错误，说明用户已经互动过了
-      if (error.code === '23505') {
-        throw new Error('您已经进行过此互动');
-      }
       throw error;
     }
 
     // 更新 moods 表的 likes_count（如果是点赞类型）
-    if (interactionType === 'empathy') {
+    if (interactionType === 'like') {
       const { error } = await supabaseAdmin.rpc('increment_likes', {
         target_mood_id: moodId,
       });
@@ -43,7 +64,7 @@ async function addInteraction(moodId, userId, interactionType) {
       if (error) throw error;
     }
 
-    return data;
+    return { action: 'added', interactionType, data };
   } catch (error) {
     console.error('添加互动失败:', error);
     throw error;
@@ -91,11 +112,8 @@ async function getMoodInteractions(moodId) {
 
     // 统计每种互动类型的数量
     const stats = {
-      empathy: 0,
-      support: 0,
-      helpful: 0,
-      grateful: 0,
-      encourage: 0,
+      like: 0,
+      unlike: 0,
     };
 
     data.forEach(interaction => {
@@ -133,9 +151,60 @@ async function hasUserInteracted(moodId, userId, interactionType) {
   }
 }
 
+// 获取用户对指定心情的互动状态
+async function getUserInteraction(moodId, userId) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('interactions')
+      .select('interaction_type')
+      .eq('mood_id', moodId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    return data ? data.interaction_type : null;
+  } catch (error) {
+    console.error('获取用户互动状态失败:', error);
+    throw error;
+  }
+}
+
+// 批量获取用户对多个心情的互动状态
+async function getUserInteractions(moodIds, userId) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('interactions')
+      .select('mood_id, interaction_type')
+      .in('mood_id', moodIds)
+      .eq('user_id', userId);
+
+    if (error) {
+      throw error;
+    }
+
+    // 转换为对象形式 { moodId: interactionType }
+    const interactions = {};
+    if (data) {
+      data.forEach(item => {
+        interactions[item.mood_id] = item.interaction_type;
+      });
+    }
+
+    return interactions;
+  } catch (error) {
+    console.error('批量获取用户互动状态失败:', error);
+    throw error;
+  }
+}
+
 export default {
   addInteraction,
   removeInteraction,
   getMoodInteractions,
   hasUserInteracted,
+  getUserInteraction,
+  getUserInteractions,
 };
