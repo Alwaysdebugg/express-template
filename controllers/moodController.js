@@ -4,7 +4,7 @@ import moodModel from '../models/Moods.js';
 // 获取心情记录列表
 export const getMoods = async (req, res) => {
   try {
-    const { user_id } = req;
+    const user_id = req.user.id;
     const moods = await moodModel.getMoods(user_id);
     res.status(200).json({
       success: true,
@@ -43,7 +43,6 @@ export const createMood = async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
     console.error('创建心情记录失败:', error);
-    throw new Error(error.message);
   }
 };
 

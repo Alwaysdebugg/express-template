@@ -23,7 +23,7 @@ export const updateOnlineStatus = async (req, res) => {
     await communityModel.updateOnlineStatus(req.body.sessionId);
     res.status(200).json({
       success: true,
-      data: onlineUsers,
+      // data: onlineUsers,
       message: '更新在线状态成功',
     });
   } catch (error) {
